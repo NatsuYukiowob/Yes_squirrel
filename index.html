@@ -464,10 +464,7 @@
 
             // 只有開啟狂熱模式時，才觸發 Fever RGB 與全螢幕閃爍
             if (isFeverModeEnabled) {
-                if (combo === 30) {
-                    document.body.classList.add('fever');
-                    spawnCornerSquirrels();
-                } else if (combo > 30) {
+                if (combo >= 30) {
                     document.body.classList.add('fever');
                 }
                 if (combo > 0 && combo % 10 === 0) {
@@ -515,6 +512,11 @@
 
         function triggerMeme(x, y) {
             updateCombo();
+
+            // 如果開啟狂熱模式，每次點擊都噴發角落松鼠 (無視 Combo)
+            if (isFeverModeEnabled) {
+                spawnCornerSquirrels();
+            }
 
             const audioClone = memeSound.cloneNode();
             audioClone.volume = 1;
