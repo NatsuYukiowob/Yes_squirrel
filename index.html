@@ -331,6 +331,13 @@
                 transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.5) rotate(var(--rot)); 
             }
         }
+
+        @keyframes squirrelPop {
+            0% { opacity: 0; transform: scale(0.5) translate(0, 0) rotate(0deg); }
+            20% { opacity: 1; transform: scale(1.5) translate(var(--tx), var(--ty)) rotate(var(--rot)); }
+            80% { opacity: 1; transform: scale(1.5) translate(var(--tx), var(--ty)) rotate(var(--rot)); }
+            100% { opacity: 0; transform: scale(2) translate(calc(var(--tx) * 1.5), calc(var(--ty) * 1.5)) rotate(calc(var(--rot) * 2)); }
+        }
     </style>
 </head>
 <body>
@@ -388,6 +395,8 @@
             if (!isFeverModeEnabled) {
                 document.body.classList.remove('fever');
                 document.body.classList.remove('flash');
+            } else {
+                spawnCornerSquirrels();
             }
         });
 
@@ -403,6 +412,38 @@
         let comboResetTimer = null;
         
         maxComboValueEl.textContent = maxCombo;
+
+        // 產生角落的松鼠特效
+        function spawnCornerSquirrels() {
+            const corners = [
+                { top: '-20px', left: '-20px', tx: '100px', ty: '100px', rot: '15deg' },
+                { top: '-20px', right: '-20px', tx: '-100px', ty: '100px', rot: '-15deg' },
+                { bottom: '-20px', left: '-20px', tx: '100px', ty: '-100px', rot: '-15deg' },
+                { bottom: '-20px', right: '-20px', tx: '-100px', ty: '-100px', rot: '15deg' }
+            ];
+
+            corners.forEach(corner => {
+                const el = document.createElement('div');
+                el.textContent = '🐿️';
+                el.style.position = 'absolute';
+                el.style.fontSize = '6rem';
+                el.style.zIndex = '50';
+                el.style.pointerEvents = 'none';
+                el.style.animation = 'squirrelPop 1.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards';
+                
+                if (corner.top) el.style.top = corner.top;
+                if (corner.bottom) el.style.bottom = corner.bottom;
+                if (corner.left) el.style.left = corner.left;
+                if (corner.right) el.style.right = corner.right;
+
+                el.style.setProperty('--tx', corner.tx);
+                el.style.setProperty('--ty', corner.ty);
+                el.style.setProperty('--rot', corner.rot);
+
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 1500);
+            });
+        }
 
         function updateCombo() {
             combo++;
@@ -423,7 +464,10 @@
 
             // 只有開啟狂熱模式時，才觸發 Fever RGB 與全螢幕閃爍
             if (isFeverModeEnabled) {
-                if (combo >= 30) {
+                if (combo === 30) {
+                    document.body.classList.add('fever');
+                    spawnCornerSquirrels();
+                } else if (combo > 30) {
                     document.body.classList.add('fever');
                 }
                 if (combo > 0 && combo % 10 === 0) {
