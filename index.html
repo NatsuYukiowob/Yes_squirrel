@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>對對對松鼠</title>
+    
+    <link rel="preload" as="image" href="background.jpeg">
+    <link rel="preload" as="audio" href="sound.mp3">
+
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            font-family: 'Microsoft JhengHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 獨立的背景層 */
+        #bg {
+            position: fixed;
+            top: -5%;
+            left: -5%;
+            width: 110%;
+            height: 110%;
+            background-color: #111;
+            background-image: url('background.jpeg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -1;
+            transition: filter 0.05s;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-15px, 15px); }
+            40% { transform: translate(15px, -15px); }
+            60% { transform: translate(-15px, -15px); }
+            80% { transform: translate(15px, 15px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        /* Fever 模式的 RGB 霓虹背景 */
+        @keyframes feverRainbow {
+            0% { filter: hue-rotate(0deg) saturate(200%); }
+            100% { filter: hue-rotate(360deg) saturate(200%); }
+        }
+
+        body.shaking #bg {
+            animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        body.fever #bg {
+            animation: feverRainbow 0.3s linear infinite;
+        }
+        
+        /* 當同時搖晃與 Fever 時 */
+        body.shaking.fever #bg {
+            animation: shake 0.1s cubic-bezier(.36,.07,.19,.97) both, feverRainbow 0.3s linear infinite;
+        }
+
+        /* 閃爍彩蛋特效 */
+        body.flash #bg {
+            filter: invert(100%) hue-rotate(180deg) brightness(200%) !important;
+        }
+
+        /* ================= 左上角設定面板 ================= */
+        #settingsPanel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 30;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px 18px;
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        #settingsPanel:hover {
+            background: rgba(0, 0, 0, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .switch-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            margin-right: 10px;
+        }
+
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #666;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        input:checked + .slider {
+            background-color: #ffcc00;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        
+        .switch-text {
+            user-select: none;
+            font-size: 1rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* ================= Combo 計數器與最高分 ================= */
+        #comboContainer {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            color: white;
+            font-size: 3rem;
+            font-weight: 900;
+            font-style: italic;
+            text-align: right;
+            text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateX(50px);
+            transition: opacity 0.3s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 20;
+            user-select: none;
+        }
+
+        #comboContainer.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        #comboCount {
+            color: #ffcc00;
+            font-size: 5rem;
+            text-shadow: 0 0 20px rgba(255, 204, 0, 0.8), 4px 4px 0 #000;
+            display: inline-block;
+        }
+
+        #highScore {
+            font-size: 1.5rem;
+            color: #ccc;
+            text-shadow: 2px 2px 4px #000;
+            display: block;
+            margin-top: 5px;
+            font-style: normal;
+        }
+
+        #highScore.new-record {
+            color: #00ffcc;
+            animation: popOut 0.5s alternate infinite;
+        }
+
+        @keyframes comboPop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4) rotate(-5deg); color: #fff; }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        
+        .pop-anim {
+            animation: comboPop 0.2s ease-out;
+        }
+
+        /* ================= 按鈕 ================= */
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+
+        /* Fever 模式下的按鈕 */
+        body.fever #playButton {
+            background: linear-gradient(135deg, rgba(255,50,50,0.6) 0%, rgba(50,50,255,0.8) 100%);
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.8);
+            border-color: #ffcc00;
+        }
+
+        #playButton {
+            position: relative;
+            z-index: 10;
+            padding: 20px 50px;
+            font-size: 4rem;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0.6) 100%);
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 30px;
+            cursor: pointer;
+            text-shadow: 0px 4px 10px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            user-select: none;
+            touch-action: manipulation;
+            transition: background 0.3s, transform 0.1s ease, box-shadow 0.1s;
+            animation: pulse 2s infinite;
+            outline: none;
+        }
+
+        #playButton:hover, #playButton:focus-visible {
+            animation: none;
+            transform: scale(1.1) translateY(-5px);
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(0,0,0,0.8) 100%);
+            box-shadow: 0 12px 40px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        #playButton:active, #playButton.active-state {
+            transform: scale(0.95) translateY(2px) !important;
+            box-shadow: 0 2px 10px 0 rgba(0, 0, 0, 0.3) !important;
+            border-color: #ccc;
+        }
+
+        /* ================= 連發按鈕區 ================= */
+        #autoFireContainer {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            display: flex;
+            gap: 15px;
+            z-index: 20;
+        }
+
+        .auto-btn {
+            padding: 12px 24px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 12px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .auto-btn:hover {
+            background: rgba(255, 204, 0, 0.4);
+            border-color: #ffcc00;
+            transform: translateY(-2px);
+        }
+        
+        .auto-btn:active {
+            transform: translateY(2px);
+        }
+
+        .auto-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 點擊噴發的文字粒子 */
+        .particle {
+            position: absolute;
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 2px 2px 6px #000, -2px -2px 6px #000, 2px -2px 6px #000, -2px 2px 6px #000;
+            z-index: 5;
+            animation: popOut 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            white-space: nowrap;
+        }
+
+        .particle.mega {
+            font-size: 4.5rem;
+            color: #ffcc00;
+            z-index: 25;
+            text-shadow: 3px 3px 10px #000, 0 0 20px #ffcc00;
+        }
+
+        @keyframes popOut {
+            0% { 
+                opacity: 1; 
+                transform: translate(-50%, -50%) scale(0.5); 
+            }
+            100% { 
+                opacity: 0; 
+                transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.5) rotate(var(--rot)); 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bg"></div>
+
+    <!-- 左上角設定區 -->
+    <div id="settingsPanel">
+        <label class="switch-label">
+            <div class="switch">
+                <input type="checkbox" id="feverToggle" checked>
+                <span class="slider"></span>
+            </div>
+            <span class="switch-text">🔥 鬼畜狂熱模式</span>
+        </label>
+    </div>
+
+    <!-- 右上角 Combo 區 -->
+    <div id="comboContainer">
+        <span id="comboCount">0</span> Combo!
+        <div id="highScore">Max Combo: <span id="maxComboValue">0</span></div>
+    </div>
+
+    <!-- 右下角自動連發區 -->
+    <div id="autoFireContainer">
+        <button class="auto-btn" id="btnAuto10">x10 連發</button>
+        <button class="auto-btn" id="btnAuto100" style="color: #ffcc00; border-color: #ffcc00;">x100 爆發</button>
+    </div>
+
+    <button id="playButton">對！</button>
+    <audio id="memeSound" src="sound.mp3" preload="auto"></audio>
+
+    <script>
+        const playButton = document.getElementById('playButton');
+        const memeSound = document.getElementById('memeSound');
+        const comboContainer = document.getElementById('comboContainer');
+        const comboCountEl = document.getElementById('comboCount');
+        const highScoreEl = document.getElementById('highScore');
+        const maxComboValueEl = document.getElementById('maxComboValue');
+        
+        const btnAuto10 = document.getElementById('btnAuto10');
+        const btnAuto100 = document.getElementById('btnAuto100');
+        let isAutoFiring = false;
+
+        // 鬼畜模式設定
+        const feverToggle = document.getElementById('feverToggle');
+        let isFeverModeEnabled = localStorage.getItem('yesMemeFeverEnabled') !== 'false'; // 預設為 true
+        feverToggle.checked = isFeverModeEnabled;
+
+        feverToggle.addEventListener('change', (e) => {
+            isFeverModeEnabled = e.target.checked;
+            localStorage.setItem('yesMemeFeverEnabled', isFeverModeEnabled);
+            
+            // 關閉時立即移除特效
+            if (!isFeverModeEnabled) {
+                document.body.classList.remove('fever');
+                document.body.classList.remove('flash');
+            }
+        });
+
+        // 避免點擊開關後焦點留在上面，導致按空白鍵時誤觸開關
+        feverToggle.addEventListener('change', () => {
+            feverToggle.blur(); 
+        });
+
+        const memeTexts = ['對！', '確實！', '沒錯！', '太對了！', '就是這樣！', '同意！', '超對！', '完全正確！'];
+        
+        let combo = 0;
+        let maxCombo = localStorage.getItem('yesMemeMaxCombo') || 0;
+        let comboResetTimer = null;
+        
+        maxComboValueEl.textContent = maxCombo;
+
+        function updateCombo() {
+            combo++;
+            
+            if (combo > maxCombo) {
+                maxCombo = combo;
+                maxComboValueEl.textContent = maxCombo;
+                localStorage.setItem('yesMemeMaxCombo', maxCombo);
+                highScoreEl.classList.add('new-record');
+            }
+            
+            comboContainer.classList.add('active');
+            comboCountEl.textContent = combo;
+            
+            comboCountEl.classList.remove('pop-anim');
+            void comboCountEl.offsetWidth; 
+            comboCountEl.classList.add('pop-anim');
+
+            // 只有開啟狂熱模式時，才觸發 Fever RGB 與全螢幕閃爍
+            if (isFeverModeEnabled) {
+                if (combo >= 30) {
+                    document.body.classList.add('fever');
+                }
+                if (combo > 0 && combo % 10 === 0) {
+                    document.body.classList.add('flash');
+                    setTimeout(() => {
+                        document.body.classList.remove('flash');
+                    }, 100); 
+                }
+            }
+
+            clearTimeout(comboResetTimer);
+            comboResetTimer = setTimeout(() => {
+                combo = 0;
+                comboContainer.classList.remove('active');
+                document.body.classList.remove('fever');
+                highScoreEl.classList.remove('new-record');
+            }, 1500);
+        }
+
+        function createParticle(x, y, isMega = false) {
+            const particle = document.createElement('div');
+            
+            particle.textContent = memeTexts[Math.floor(Math.random() * memeTexts.length)];
+            particle.className = 'particle';
+            if (isMega) particle.classList.add('mega');
+            
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            
+            const spreadMult = isMega ? 2 : ((isFeverModeEnabled && combo >= 30) ? 1.5 : 1);
+            const randomX = (Math.random() - 0.5) * 400 * spreadMult;
+            const randomY = - (Math.random() * 200 + 150) * spreadMult;
+            const randomRot = (Math.random() - 0.5) * 80;
+
+            particle.style.setProperty('--tx', `${randomX}px`);
+            particle.style.setProperty('--ty', `${randomY}px`);
+            particle.style.setProperty('--rot', `${randomRot}deg`);
+
+            document.body.appendChild(particle);
+
+            setTimeout(() => {
+                particle.remove();
+            }, 800);
+        }
+
+        function triggerMeme(x, y) {
+            updateCombo();
+
+            const audioClone = memeSound.cloneNode();
+            audioClone.volume = 1;
+            
+            // 變聲系統綁定狂熱模式
+            if (isFeverModeEnabled) {
+                const pitchSpeed = Math.min(2.5, 1 + (combo * 0.025));
+                audioClone.playbackRate = pitchSpeed;
+                audioClone.preservesPitch = false; 
+                audioClone.mozPreservesPitch = false;
+                audioClone.webkitPreservesPitch = false;
+            } else {
+                audioClone.playbackRate = 1;
+            }
+
+            audioClone.play().catch(e => console.error("音效播放失敗:", e));
+            audioClone.addEventListener('ended', () => {
+                audioClone.remove();
+            });
+
+            document.body.classList.remove('shaking');
+            void document.body.offsetWidth;
+            document.body.classList.add('shaking');
+
+            const isHighCombo = combo >= 15;
+            const particleCount = (isFeverModeEnabled && combo >= 30) ? 7 : (isHighCombo ? 5 : 3);
+
+            for(let i = 0; i < particleCount; i++) {
+                setTimeout(() => {
+                    const isMega = (combo % 5 === 0) && (Math.random() > 0.4);
+                    createParticle(x, y, isMega);
+                }, i * 20);
+            }
+        }
+
+        // --- 事件綁定 ---
+        playButton.addEventListener('pointerdown', (e) => {
+            triggerMeme(e.clientX, e.clientY);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                if (e.code === 'Space') e.preventDefault();
+                if (e.repeat) return; 
+
+                const rect = playButton.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                playButton.classList.add('active-state');
+                triggerMeme(centerX, centerY);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                playButton.classList.remove('active-state');
+            }
+        });
+        
+        playButton.addEventListener('click', (e) => {
+            if(e.detail === 0) {
+                e.preventDefault();
+            }
+        });
+
+        // --- 自動連發功能邏輯 ---
+        function executeAutoFire(times, intervalMs) {
+            if (isAutoFiring) return;
+            isAutoFiring = true;
+            btnAuto10.disabled = true;
+            btnAuto100.disabled = true;
+
+            const rect = playButton.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let count = 0;
+            const fireInterval = setInterval(() => {
+                // 模擬按下按鈕的視覺效果
+                playButton.classList.add('active-state');
+                triggerMeme(centerX, centerY);
+                
+                // 模擬放開按鈕的視覺效果 (稍微延遲)
+                setTimeout(() => {
+                    playButton.classList.remove('active-state');
+                }, intervalMs * 0.5);
+
+                count++;
+                if (count >= times) {
+                    clearInterval(fireInterval);
+                    isAutoFiring = false;
+                    btnAuto10.disabled = false;
+                    btnAuto100.disabled = false;
+                }
+            }, intervalMs);
+        }
+
+        btnAuto10.addEventListener('click', () => {
+            // 每秒約 5 下，持續 10 下
+            executeAutoFire(10, 200);
+            btnAuto10.blur();
+        });
+
+        btnAuto100.addEventListener('click', () => {
+            // 每秒約 12 下 (極快速)，持續 100 下
+            executeAutoFire(100, 80);
+            btnAuto100.blur();
+        });
+
+    </script>
+</body>
+</html>
